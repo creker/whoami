@@ -54,13 +54,16 @@ func dataHandler(ctx *fasthttp.RequestCtx) {
 	}
 
 	if delay.Valid {
-		timer := timerPool.Get().(*time.Timer)
 		if delay.Range {
 			delay.Max = time.Duration(random.NormFloat64(float64(delay.Min), float64(delay.Max)))
 		}
-		timer.Reset(delay.Max)
-		<-timer.C
-		timerPool.Put(timer)
+		timer := acquireTimer(delay.Max)
+		defer releaseTimer(timer)
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			return
+		}
 	}
 
 	if headerSize.Valid && headerSize.Range {
